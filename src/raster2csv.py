@@ -10,11 +10,7 @@ from datetime import datetime
 
 def raster2csv(src_rasters, csv_file, separator, max_block_size):
     """
-    Convert rasters to CSV. Run in parallel by reading blocks.
-    The first raster determines number of output rows.
-    Only cells which are are above given Threshold/ not NoData are processed
-    The tool calculates lat lon for every grid cell and extract the cell value.
-    If more than one input raster is provided tool adds additional columns to CSV with coresponing values.
+    Convert rasters to CSV.
     Input rasters must match cell size and extent.
     Tool writes final result text file
     :param src_rasters: list of input rasters
@@ -23,6 +19,24 @@ def raster2csv(src_rasters, csv_file, separator, max_block_size):
     :param max_block_size: max block size to process
     :param workers: number of parallel processes
     :return: None
+    """
+
+    table = raster2df(src_rasters, max_block_size)
+
+    table.to_csv(csv_file, sep=separator, header=True, index=False)
+
+
+def raster2df(src_rasters, max_block_size):
+    """
+    Converts raster into Panda DataFrame.
+    Input rasters must match cell size and extent.
+    The first raster determines number of output rows.
+    Only cells which are are above given Threshold/ not NoData are processed
+    The tool calculates lat lon for every grid cell and extract the cell value.
+    If more than one input raster is provided tool adds additional columns to CSV with coresponing values.
+    :param src_rasters:
+    :param max_block_size:
+    :return:
     """
 
     sources = list()
@@ -59,16 +73,16 @@ def raster2csv(src_rasters, csv_file, separator, max_block_size):
     for df in dfs:
 
         if first:
-            table = df
+            dataframe = df
             first = False
         else:
 
-            table = pd.concat([table, df])
+            table = pd.concat([dataframe, df])
 
     for src in sources:
         src.close()
 
-    table.to_csv(csv_file, sep=separator, header=True, index=False)
+    return dataframe
 
 
 def process_blocks(
