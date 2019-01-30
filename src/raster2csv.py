@@ -3,49 +3,78 @@ import rasterio
 import numpy as np
 import math
 import argparse
+import itertools
+from parallelpipe import Stage
+from datetime import datetime
 
 
-def raster2csv(src_rasters, output, separator, max_block_size):
+def raster2csv(src_rasters, csv_file, separator, max_block_size):
 
     with rasterio.open(src_rasters[0]) as src:
 
         affine = src.transform
-        col_size = affine[0]
-        row_size = affine[4]
-
         step_width, step_height = get_steps(src, max_block_size)
 
-        first = True
+        kwargs = {
+            "col_size": affine[0],
+            "row_size": affine[4],
+            "step_width": step_width,
+            "step_height": step_height,
+            "width": src.width,
+            "height": src.height,
+        }
 
-        for col in range(0, src.width, step_width):
+        cols = range(0, src.width, step_width)
+        rows = range(0, src.height, step_height)
 
-            width = get_window_width(col, step_width, src.width)
+    blocks = itertools.product(cols, rows)
 
-            for row in range(0, src.height, step_height):
+    pipe = blocks | Stage(compute_blocks, src_rasters, **kwargs).setup(workers=2)
 
-                height = get_window_height(row, step_height, src.height)
-                window = Window(col, row, width, height)
-                left, top, right, bottom = src.window_bounds(window)
-                w = src.read(1, window=window)
+    first = True
+    for output in pipe.results():
+        output = np.asarray(output)
+        print(output.shape)
 
-                lat_lon = get_lat_lon(w, col_size, row_size, left, bottom)
-                del w
+        if first:
+            table = output
+            first = False
+        else:
 
-                values = get_values(src_rasters, window)
+            table = np.vstack((table, output))
 
-                if first:
-                    table = np.concatenate((lat_lon, values), axis=1)
-                    first = False
-                else:
-                    table = np.vstack(
-                        (table, np.concatenate((lat_lon, values), axis=1))
-                    )
+    np.savetxt(
+        csv_file,
+        table,
+        fmt="%.6f{0} %.6f{0} %{1}".format(separator, get_date_type(src)),
+    )
 
-        np.savetxt(
-            output,
-            table,
-            fmt="%.6f{0} %.6f{0} %{1}".format(separator, get_date_type(src)),
-        )
+
+def compute_blocks(
+    blocks, src_rasters, col_size, row_size, step_width, step_height, width, height
+):
+
+    for block in blocks:
+
+        col = block[0]
+        row = block[1]
+
+        w_width = get_window_width(col, step_width, width)
+        w_height = get_window_height(row, step_height, height)
+        window = Window(col, row, w_width, w_height)
+
+        with rasterio.open(src_rasters[0]) as src:
+            left, top, right, bottom = src.window_bounds(window)
+            w = src.read(1, window=window)
+            lat_lon = get_lat_lon(w, col_size, row_size, left, bottom)
+        del w
+
+        if lat_lon.shape[0] == 0:
+            break
+
+        values = get_values(src_rasters, window)
+
+        yield np.concatenate((lat_lon, values), axis=1).tolist()
 
 
 def get_lat_lon(array, x_size, y_size, left, bottom):
@@ -121,12 +150,19 @@ def main():
 
     parser = argparse.ArgumentParser(description="Convert raster to CSV")
 
-    parser.add_argument("input", nargs="+", metavar="INPUT", type=str, help="Input Raster")
+    parser.add_argument(
+        "input", nargs="+", metavar="INPUT", type=str, help="Input Raster"
+    )
 
     parser.add_argument("output", metavar="OUTPUT", type=str, help="Output CSV")
 
     parser.add_argument(
-        "--separator", "-s", default=",", choices=[",", ";", "t"], type=str, help="Separator"
+        "--separator",
+        "-s",
+        default=",",
+        choices=[",", ";", "t"],
+        type=str,
+        help="Separator",
     )
 
     parser.add_argument(
@@ -147,4 +183,6 @@ def main():
 
 
 if __name__ == "__main__":
+    now = datetime.now()
     main()
+    print(datetime.now() - now)
