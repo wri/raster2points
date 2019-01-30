@@ -1,12 +1,14 @@
 from rasterio.windows import Window
 import rasterio
 import numpy as np
+import pandas as pd
 import math
 import argparse
 import itertools
-from parallelpipe import Stage
-from datetime import datetime
 import multiprocessing
+
+# from parallelpipe import Stage
+from datetime import datetime
 
 
 def raster2csv(src_rasters, csv_file, separator, max_block_size, workers):
@@ -45,24 +47,24 @@ def raster2csv(src_rasters, csv_file, separator, max_block_size, workers):
 
     blocks = itertools.product(cols, rows)
 
-    pipe = blocks | Stage(process_blocks, src_rasters, **kwargs).setup(workers=workers)
+    # pipe = blocks | Stage(process_blocks, src_rasters, **kwargs).setup(workers=workers)
+    # Tried using parallel pipeline to speed up processing
+    # This throws and error b/c truth numpy arrays and pandas data frames are ambiguous.
+    # Submitted ticket here https://github.com/gtsystem/parallelpipe/issues/1
+    # Not sure if this is something parallelpipe can fix or if this is multiprocssing issue
+    dfs = process_blocks(blocks, src_rasters, **kwargs)
 
     first = True
-    for output in pipe.results():
-        output = np.asarray(output)
+    for df in dfs:
 
         if first:
-            table = output
+            table = df
             first = False
         else:
 
-            table = np.vstack((table, output))
+            table = pd.concat([table, df])
 
-    np.savetxt(
-        csv_file,
-        table,
-        fmt="%.6f{0} %.6f{0} %{1}".format(separator, get_date_type(src)),
-    )
+    table.to_csv(csv_file, sep=separator, header=True, index=False)
 
 
 def process_blocks(
@@ -102,7 +104,7 @@ def process_blocks(
 
         values = get_values(src_rasters, window)
 
-        yield np.concatenate((lat_lon, values), axis=1).tolist()
+        yield pd.concat([lat_lon, values], axis=1)
 
 
 def get_lat_lon(array, x_size, y_size, left, bottom):
@@ -122,23 +124,17 @@ def get_lat_lon(array, x_size, y_size, left, bottom):
     x_coords = x_index * x_size + left + (x_size / 2)
     y_coords = y_index * y_size + bottom + (y_size / 2)
 
-    lon = x_coords.reshape(len(x_coords), 1)
-    lat = y_coords.reshape(len(y_coords), 1)
+    lon = pd.Series(x_coords)  # x_coords.reshape(len(x_coords), 1)
+    lat = pd.Series(y_coords)  # y_coords.reshape(len(y_coords), 1)
 
-    return np.concatenate((lon, lat), axis=1)
+    df = pd.DataFrame(
+        {
+            "lon": lon.astype("float32", copy=False),
+            "lat": lat.astype("float32", copy=False),
+        }
+    )
 
-
-def get_value(array, threshold=0):
-    """
-    Extract value for all non null cells
-    :param array: Image to process
-    :param threshold: threshold to filter
-    :return: Table with values
-    """
-
-    mask = array > threshold
-    v = np.extract(mask, array)
-    return v.reshape(len(v), 1)
+    return df  # np.concatenate((lon, lat), axis=1)
 
 
 def get_values(src_rasters, window, threshold=0):
@@ -149,22 +145,27 @@ def get_values(src_rasters, window, threshold=0):
     :param threshold:
     :return:
     """
-    first = True
+    df_col = 0
     for raster in src_rasters:
         with rasterio.open(raster) as src:
+            dtype = src.dtypes[0]
             w = src.read(1, window=window)
 
-            if first:
-                mask = w > threshold
-            v = np.extract(mask, w)
+        if df_col == 0:
+            mask = w > threshold
 
-            if first:
-                values = v.reshape(len(v), 1)
-                first = False
-            else:
-                np.concatenate((values, v.reshape(len(v), 1)), axis=1)
+        s = pd.Series(np.extract(mask, w))
 
-    return values
+        if df_col == 0:
+            df = pd.DataFrame({"val{}".format(df_col): s.astype(dtype, copy=False)})
+            # values = v.reshape(len(v), 1)
+            # first = False
+        else:
+            df["val{}".format(df_col)] = s.astype(dtype, copy=False)
+            # values = np.concatenate((values, v.reshape(len(v), 1)), axis=1)
+        df_col += 1
+
+    return df
 
 
 def get_steps(image, max_size=4096):
