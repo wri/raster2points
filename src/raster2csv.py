@@ -77,7 +77,7 @@ def raster2df(src_rasters, max_block_size):
             first = False
         else:
 
-            table = pd.concat([dataframe, df])
+            dataframe = pd.concat([dataframe, df])
 
     for src in sources:
         src.close()
