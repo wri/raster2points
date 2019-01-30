@@ -8,7 +8,7 @@ import itertools
 from datetime import datetime
 
 
-def raster2csv(src_rasters, csv_file, separator, max_block_size):
+def raster2csv(src_rasters, csv_file, separator, max_block_size=4096):
     """
     Convert rasters to CSV.
     Input rasters must match cell size and extent.
@@ -17,7 +17,6 @@ def raster2csv(src_rasters, csv_file, separator, max_block_size):
     :param csv_file: output file
     :param separator: separator used in CSV file
     :param max_block_size: max block size to process
-    :param workers: number of parallel processes
     :return: None
     """
 
@@ -26,7 +25,7 @@ def raster2csv(src_rasters, csv_file, separator, max_block_size):
     table.to_csv(csv_file, sep=separator, header=True, index=False)
 
 
-def raster2df(src_rasters, max_block_size):
+def raster2df(src_rasters, max_block_size=4096):
     """
     Converts raster into Panda DataFrame.
     Input rasters must match cell size and extent.
