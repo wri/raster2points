@@ -5,13 +5,10 @@ import pandas as pd
 import math
 import argparse
 import itertools
-import multiprocessing
-
-# from parallelpipe import Stage
 from datetime import datetime
 
 
-def raster2csv(src_rasters, csv_file, separator, max_block_size, workers):
+def raster2csv(src_rasters, csv_file, separator, max_block_size):
     """
     Convert rasters to CSV. Run in parallel by reading blocks.
     The first raster determines number of output rows.
@@ -28,22 +25,25 @@ def raster2csv(src_rasters, csv_file, separator, max_block_size, workers):
     :return: None
     """
 
-    with rasterio.open(src_rasters[0]) as src:
+    sources = list()
+    for src in src_rasters:
+        sources.append(rasterio.open(src))
 
-        affine = src.transform
-        step_width, step_height = get_steps(src, max_block_size)
+    src = sources[0]
+    affine = src.transform
+    step_width, step_height = get_steps(src, max_block_size)
 
-        kwargs = {
-            "col_size": affine[0],
-            "row_size": affine[4],
-            "step_width": step_width,
-            "step_height": step_height,
-            "width": src.width,
-            "height": src.height,
-        }
+    kwargs = {
+        "col_size": affine[0],
+        "row_size": affine[4],
+        "step_width": step_width,
+        "step_height": step_height,
+        "width": src.width,
+        "height": src.height,
+    }
 
-        cols = range(0, src.width, step_width)
-        rows = range(0, src.height, step_height)
+    cols = range(0, src.width, step_width)
+    rows = range(0, src.height, step_height)
 
     blocks = itertools.product(cols, rows)
 
@@ -52,7 +52,8 @@ def raster2csv(src_rasters, csv_file, separator, max_block_size, workers):
     # This throws and error b/c truth numpy arrays and pandas data frames are ambiguous.
     # Submitted ticket here https://github.com/gtsystem/parallelpipe/issues/1
     # Not sure if this is something parallelpipe can fix or if this is multiprocssing issue
-    dfs = process_blocks(blocks, src_rasters, **kwargs)
+
+    dfs = process_blocks(blocks, sources, **kwargs)
 
     first = True
     for df in dfs:
@@ -64,11 +65,14 @@ def raster2csv(src_rasters, csv_file, separator, max_block_size, workers):
 
             table = pd.concat([table, df])
 
+    for src in sources:
+        src.close()
+
     table.to_csv(csv_file, sep=separator, header=True, index=False)
 
 
 def process_blocks(
-    blocks, src_rasters, col_size, row_size, step_width, step_height, width, height
+    blocks, sources, col_size, row_size, step_width, step_height, width, height
 ):
     """
     Loops over all blocks and reads first input raster to get coordinates.
@@ -93,16 +97,17 @@ def process_blocks(
         w_height = get_window_height(row, step_height, height)
         window = Window(col, row, w_width, w_height)
 
-        with rasterio.open(src_rasters[0]) as src:
-            left, top, right, bottom = src.window_bounds(window)
-            w = src.read(1, window=window)
-            lat_lon = get_lat_lon(w, col_size, row_size, left, bottom)
+        src = sources[0]
+
+        left, top, right, bottom = src.window_bounds(window)
+        w = src.read(1, window=window)
+        lat_lon = get_lat_lon(w, col_size, row_size, left, bottom)
         del w
 
         if lat_lon.shape[0] == 0:
             break
 
-        values = get_values(src_rasters, window)
+        values = get_values(sources, window)
 
         yield pd.concat([lat_lon, values], axis=1)
 
@@ -124,8 +129,8 @@ def get_lat_lon(array, x_size, y_size, left, bottom):
     x_coords = x_index * x_size + left + (x_size / 2)
     y_coords = y_index * y_size + bottom + (y_size / 2)
 
-    lon = pd.Series(x_coords)  # x_coords.reshape(len(x_coords), 1)
-    lat = pd.Series(y_coords)  # y_coords.reshape(len(y_coords), 1)
+    lon = pd.Series(x_coords)
+    lat = pd.Series(y_coords)
 
     df = pd.DataFrame(
         {
@@ -134,10 +139,10 @@ def get_lat_lon(array, x_size, y_size, left, bottom):
         }
     )
 
-    return df  # np.concatenate((lon, lat), axis=1)
+    return df
 
 
-def get_values(src_rasters, window, threshold=0):
+def get_values(sources, window, threshold=0):
     """
     Extract values for all non null cells for all input images
     :param src_rasters:
@@ -146,10 +151,9 @@ def get_values(src_rasters, window, threshold=0):
     :return:
     """
     df_col = 0
-    for raster in src_rasters:
-        with rasterio.open(raster) as src:
-            dtype = src.dtypes[0]
-            w = src.read(1, window=window)
+    for src in sources:
+        dtype = src.dtypes[0]
+        w = src.read(1, window=window)
 
         if df_col == 0:
             mask = w > threshold
@@ -158,11 +162,10 @@ def get_values(src_rasters, window, threshold=0):
 
         if df_col == 0:
             df = pd.DataFrame({"val{}".format(df_col): s.astype(dtype, copy=False)})
-            # values = v.reshape(len(v), 1)
-            # first = False
+
         else:
             df["val{}".format(df_col)] = s.astype(dtype, copy=False)
-            # values = np.concatenate((values, v.reshape(len(v), 1)), axis=1)
+
         df_col += 1
 
     return df
@@ -215,18 +218,6 @@ def get_window_height(row, step_height, image_height):
         return step_height
 
 
-def get_date_type(image):
-    """
-    Get data type of current image to correctly format CSV
-    :param image:
-    :return:
-    """
-    if "int" in image.dtypes[0]:
-        return "d"
-    else:
-        return "6f"
-
-
 def main():
 
     parser = argparse.ArgumentParser(description="Convert raster to CSV")
@@ -253,14 +244,6 @@ def main():
         help="max block size (multiple of 256)",
     )
 
-    parser.add_argument(
-        "--workers",
-        "-w",
-        default=multiprocessing.cpu_count(),
-        type=int,
-        help="Number of parallel processes",
-    )
-
     args = parser.parse_args()
 
     if args.separator == "t":
@@ -268,7 +251,7 @@ def main():
     else:
         separator = args.seperator
 
-    raster2csv(args.input, args.output, separator, args.max_block_size, args.workers)
+    raster2csv(args.input, args.output, separator, args.max_block_size)
 
 
 if __name__ == "__main__":
