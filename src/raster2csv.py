@@ -32,9 +32,15 @@ def raster2csv(input, output, separator, max_block_size):
                     table = get_xyz(w, col_size, row_size, left, bottom)
                     first = False
                 else:
-                    table = np.vstack((table, get_xyz(w, col_size, row_size, left, bottom)))
+                    table = np.vstack(
+                        (table, get_xyz(w, col_size, row_size, left, bottom))
+                    )
 
-        np.savetxt(output, table, fmt='%.6f{0} %.6f{0} %{1}'.format(separator, get_date_type(src)))
+        np.savetxt(
+            output,
+            table,
+            fmt="%.6f{0} %.6f{0} %{1}".format(separator, get_date_type(src)),
+        )
 
 
 def get_xyz(array, x_size, y_size, left, bottom):
@@ -57,8 +63,8 @@ def get_xyz(array, x_size, y_size, left, bottom):
 def get_steps(image, max_size=4096):
 
     shape = image.block_shapes[0]
-    step_width = math.floor(max_size/shape[0]) * shape[0]
-    step_height = math.floor(max_size/shape[1]) * shape[1]
+    step_width = math.floor(max_size / shape[0]) * shape[0]
+    step_height = math.floor(max_size / shape[1]) * shape[1]
 
     return step_width, step_height
 
@@ -86,48 +92,32 @@ def get_date_type(image):
 
 def main():
 
-        parser = argparse.ArgumentParser(description="Convert raster to CSV")
+    parser = argparse.ArgumentParser(description="Convert raster to CSV")
 
-        parser.add_argument(
-            "input",
-            metavar='INPUT',
-            type=str,
-            help="Input Raster",
-        )
+    parser.add_argument("input", metavar="INPUT", type=str, help="Input Raster")
 
-        parser.add_argument(
-            "output",
-            metavar='OUTPUT',
-            type=str,
-            help="Output CSV",
-        )
+    parser.add_argument("output", metavar="OUTPUT", type=str, help="Output CSV")
 
-        parser.add_argument(
-            "--separator",
-            "-s",
-            choices=[',', ';', 't'],
-            type=str,
-            help="Separator",
-        )
+    parser.add_argument(
+        "--separator", "-s", choices=[",", ";", "t"], type=str, help="Separator"
+    )
 
-        parser.add_argument(
-            "--max_block_size",
-            default=4096,
-            type=int,
-            help="max block size (multiple of 256)"
-        )
+    parser.add_argument(
+        "--max_block_size",
+        default=4096,
+        type=int,
+        help="max block size (multiple of 256)",
+    )
 
-        args = parser.parse_args()
+    args = parser.parse_args()
 
-        if args.separator=="t":
-            separator = "\t"
-        else:
-            separator = args.seperator
+    if args.separator == "t":
+        separator = "\t"
+    else:
+        separator = args.seperator
 
-        raster2csv(args.input, args.output, separator, args.max_block_size)
+    raster2csv(args.input, args.output, separator, args.max_block_size)
 
 
 if __name__ == "__main__":
     main()
-
-
