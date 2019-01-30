@@ -7,13 +7,13 @@ from first input raster.
 
 Output file is a CSV file.
 
-##Usage:
+## Usage:
 ```bash
 raster2csv.py [-h] [--separator {,,;,t}] [--max_block_size MAX_BLOCK_SIZE] INPUT [INPUT ...] OUTPUT
 
 ``` 
 
-##Installation and Dependencies
+## Installation and Dependencies
 
 This module use rasterio and requires `GDAL>=1.11` to be installed.
 This module is not yet available on pypy 
