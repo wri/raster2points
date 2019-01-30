@@ -189,11 +189,18 @@ def get_steps(image, max_size=4096):
     """
     Compute optimal block size.
     Should be always a multiple of image block size
+    Only if block size is bigger than maximal allowed step size,
+    value will be forced to max_size
     :param image: image to process
-    :param max_size: maximal block size
-    :return: block width and height
+    :param max_size: maximal step size
+    :return: step width and height
     """
     shape = image.block_shapes[0]
+    if shape[0] > max_size:
+        shape[0] = max_size
+    if shape[1] > max_size:
+        shape[1] = max_size
+
     step_width = math.floor(max_size / shape[0]) * shape[0]
     step_height = math.floor(max_size / shape[1]) * shape[1]
 
