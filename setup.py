@@ -9,10 +9,6 @@ setup(
     py_modules=["raster2csv"],
     author="thomas.maschler",
     license="MIT",
-    install_requires=[
-        "rasterio",
-    ],
-    scripts=[
-        "src/raster2csv.py",
-    ],
+    install_requires=["rasterio"],
+    scripts=["src/raster2csv.py"],
 )

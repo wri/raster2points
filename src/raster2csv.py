@@ -5,9 +5,9 @@ import math
 import argparse
 
 
-def raster2csv(input, output, separator, max_block_size):
+def raster2csv(src_rasters, output, separator, max_block_size):
 
-    with rasterio.open(input) as src:
+    with rasterio.open(src_rasters[0]) as src:
 
         affine = src.transform
         col_size = affine[0]
@@ -18,22 +18,27 @@ def raster2csv(input, output, separator, max_block_size):
         first = True
 
         for col in range(0, src.width, step_width):
+
+            width = get_window_width(col, step_width, src.width)
+
             for row in range(0, src.height, step_height):
 
-                width = get_window_width(col, step_width, src.width)
                 height = get_window_height(row, step_height, src.height)
-
                 window = Window(col, row, width, height)
-
                 left, top, right, bottom = src.window_bounds(window)
                 w = src.read(1, window=window)
 
+                lat_lon = get_lat_lon(w, col_size, row_size, left, bottom)
+                del w
+
+                values = get_values(src_rasters, window)
+
                 if first:
-                    table = get_xyz(w, col_size, row_size, left, bottom)
+                    table = np.concatenate((lat_lon, values), axis=1)
                     first = False
                 else:
                     table = np.vstack(
-                        (table, get_xyz(w, col_size, row_size, left, bottom))
+                        (table, np.concatenate((lat_lon, values), axis=1))
                     )
 
         np.savetxt(
@@ -43,8 +48,7 @@ def raster2csv(input, output, separator, max_block_size):
         )
 
 
-def get_xyz(array, x_size, y_size, left, bottom):
-
+def get_lat_lon(array, x_size, y_size, left, bottom):
     (y_index, x_index) = np.nonzero(array)
 
     x_coords = x_index * x_size + left + (x_size / 2)
@@ -53,11 +57,34 @@ def get_xyz(array, x_size, y_size, left, bottom):
     lon = x_coords.reshape(len(x_coords), 1)
     lat = y_coords.reshape(len(y_coords), 1)
 
-    mask = array > 0
-    v = np.extract(mask, array)
-    value = v.reshape(len(v), 1)
+    return np.concatenate((lon, lat), axis=1)
 
-    return np.concatenate((lon, lat, value), axis=1)
+
+def get_value(array, threshold=0):
+
+    mask = array > threshold
+    v = np.extract(mask, array)
+    return v.reshape(len(v), 1)
+
+
+def get_values(src_rasters, window, threshold=0):
+
+    first = True
+    for raster in src_rasters:
+        with rasterio.open(raster) as src:
+            w = src.read(1, window=window)
+
+            if first:
+                mask = w > threshold
+            v = np.extract(mask, w)
+
+            if first:
+                values = v.reshape(len(v), 1)
+                first = False
+            else:
+                np.concatenate((values, v.reshape(len(v), 1)), axis=1)
+
+    return values
 
 
 def get_steps(image, max_size=4096):
@@ -94,12 +121,12 @@ def main():
 
     parser = argparse.ArgumentParser(description="Convert raster to CSV")
 
-    parser.add_argument("input", metavar="INPUT", type=str, help="Input Raster")
+    parser.add_argument("input", nargs="+", metavar="INPUT", type=str, help="Input Raster")
 
     parser.add_argument("output", metavar="OUTPUT", type=str, help="Output CSV")
 
     parser.add_argument(
-        "--separator", "-s", choices=[",", ";", "t"], type=str, help="Separator"
+        "--separator", "-s", default=",", choices=[",", ";", "t"], type=str, help="Separator"
     )
 
     parser.add_argument(
