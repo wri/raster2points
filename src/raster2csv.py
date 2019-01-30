@@ -6,9 +6,10 @@ import argparse
 import itertools
 from parallelpipe import Stage
 from datetime import datetime
+import multiprocessing
 
 
-def raster2csv(src_rasters, csv_file, separator, max_block_size):
+def raster2csv(src_rasters, csv_file, separator, max_block_size, workers):
 
     with rasterio.open(src_rasters[0]) as src:
 
@@ -29,12 +30,11 @@ def raster2csv(src_rasters, csv_file, separator, max_block_size):
 
     blocks = itertools.product(cols, rows)
 
-    pipe = blocks | Stage(compute_blocks, src_rasters, **kwargs).setup(workers=2)
+    pipe = blocks | Stage(compute_blocks, src_rasters, **kwargs).setup(workers=workers)
 
     first = True
     for output in pipe.results():
         output = np.asarray(output)
-        print(output.shape)
 
         if first:
             table = output
@@ -172,6 +172,14 @@ def main():
         help="max block size (multiple of 256)",
     )
 
+    parser.add_argument(
+        "--workers",
+        "-w",
+        default=multiprocessing.cpu_count(),
+        type=int,
+        help="Number of parallel processes",
+    )
+
     args = parser.parse_args()
 
     if args.separator == "t":
@@ -179,7 +187,7 @@ def main():
     else:
         separator = args.seperator
 
-    raster2csv(args.input, args.output, separator, args.max_block_size)
+    raster2csv(args.input, args.output, separator, args.max_block_size, args.workers)
 
 
 if __name__ == "__main__":
