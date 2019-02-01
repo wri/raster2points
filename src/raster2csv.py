@@ -40,8 +40,19 @@ def raster2df(src_rasters, max_block_size=4096, calc_area=False):
     """
 
     sources = list()
+    i = 0
     for src in src_rasters:
+
+        if i == 0:
+            width = src.width
+            height = src.height
+            transform = src.transform
+        else:
+            assert (width == src.width), "Input images have different width"
+            assert (height == src.height), "Input images have different height"
+            assert (transform == src.transform), "Input images have pixel size and/or extent"
         sources.append(rasterio.open(src))
+        i += 1
 
     src = sources[0]
     affine = src.transform
@@ -192,12 +203,12 @@ def get_values(sources, window, threshold=0):
     return df
 
 
-@jit()
+@jit()  # using numba.jit to precompile calculations
 def get_coord(index, size, offset):
     return index * size + offset + (size / 2)
 
 
-@jit()
+@jit()  # using numba.jit to precompile calculations
 def get_area(lat, d_lat, d_lon):
     """
     Calculate geodesic area for grid cells using WGS 1984 as spatial reference.
