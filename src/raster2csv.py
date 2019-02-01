@@ -41,17 +41,20 @@ def raster2df(src_rasters, max_block_size=4096, calc_area=False):
 
     sources = list()
     i = 0
-    for src in src_rasters:
+    for raster in src_rasters:
 
+        src = rasterio.open(raster)
         if i == 0:
             width = src.width
             height = src.height
             transform = src.transform
         else:
-            assert (width == src.width), "Input images have different width"
-            assert (height == src.height), "Input images have different height"
-            assert (transform == src.transform), "Input images have pixel size and/or extent"
-        sources.append(rasterio.open(src))
+            assert width == src.width, "Input images have different width"
+            assert height == src.height, "Input images have different height"
+            assert (
+                transform == src.transform
+            ), "Input images have pixel size and/or extent"
+        sources.append(src)
         i += 1
 
     src = sources[0]
@@ -65,7 +68,7 @@ def raster2df(src_rasters, max_block_size=4096, calc_area=False):
         "step_height": step_height,
         "width": src.width,
         "height": src.height,
-        "calc_area": calc_area
+        "calc_area": calc_area,
     }
 
     cols = range(0, src.width, step_width)
@@ -100,7 +103,15 @@ def raster2df(src_rasters, max_block_size=4096, calc_area=False):
 
 
 def process_blocks(
-    blocks, sources, col_size, row_size, step_width, step_height, width, height, calc_area
+    blocks,
+    sources,
+    col_size,
+    row_size,
+    step_width,
+    step_height,
+    width,
+    height,
+    calc_area,
 ):
     """
     Loops over all blocks and reads first input raster to get coordinates.
@@ -168,7 +179,9 @@ def get_lat_lon(array, x_size, y_size, left, bottom, calc_area):
     )
 
     if calc_area:
-        area = pd.Series(get_area(y_coords, y_size, x_size)).astype("float32", copy=False)
+        area = pd.Series(get_area(y_coords, y_size, x_size)).astype(
+            "float32", copy=False
+        )
         df["area"] = area
 
     return df
