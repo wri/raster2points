@@ -2,13 +2,12 @@ from setuptools import setup  # , Extension
 
 
 setup(
-    name="raster2csv",
+    name="raster2points",
     version="0.0.1",
     description="Tool to convert rasters to CSV files",
     package_dir={"": "src"},
-    py_modules=["raster2csv"],
     author="thomas.maschler",
     license="MIT",
-    install_requires=["rasterio, pandas"],
+    install_requires=["rasterio", "pandas", "numba"],
     scripts=["src/raster2csv.py"],
 )
