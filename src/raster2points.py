@@ -5,6 +5,13 @@ import pandas as pd
 import math
 import itertools
 from numba import jit
+import logging
+import sys
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler(sys.stdout)
+logger.addHandler(handler)
 
 
 def raster2csv(*files, separator=",", max_block_size=4096, calc_area=False):
@@ -21,12 +28,16 @@ def raster2csv(*files, separator=",", max_block_size=4096, calc_area=False):
 
     assert len(files) >= 2, "No output file provided"
 
-    csv_file = files[-1:]
+    csv_file = files[-1:][0]  # files[-1:] returns a tuple with one element
     src_rasters = files[:-1]
 
+    logging.info("Compiling data")
     table = raster2df(*src_rasters, max_block_size=max_block_size, calc_area=calc_area)
 
+    logging.info("Writing to file: " + csv_file)
     table.to_csv(csv_file, sep=separator, header=True, index=False)
+
+    logging.info("Done.")
 
 
 def raster2df(*src_rasters, max_block_size=4096, calc_area=False):
@@ -46,29 +57,33 @@ def raster2df(*src_rasters, max_block_size=4096, calc_area=False):
     first = True
     for raster in src_rasters:
 
-        src = rasterio.open(raster)
-        if first:
-            width = src.width
-            height = src.height
-            left, bottom, right, top = src.bounds
-            first = False
-        else:
-            assert width == src.width, "Input images have different width"
-            assert height == src.height, "Input images have different height"
-            s_left, s_bottom, s_right, s_top = src.bounds
-            assert round(left, 4) == round(
-                s_left, 4
-            ), "Input images have different bounds"
-            assert round(bottom, 4) == round(
-                s_bottom, 4
-            ), "Input images have different bounds"
-            assert round(right, 4) == round(
-                s_right, 4
-            ), "Input images have different bounds"
-            assert round(top, 4) == round(
-                s_top, 4
-            ), "Input images have different bounds"
-        sources.append(src)
+        try:
+            src = rasterio.open(raster)
+            if first:
+                width = src.width
+                height = src.height
+                left, bottom, right, top = src.bounds
+                first = False
+            else:
+                assert width == src.width, "Input images have different width"
+                assert height == src.height, "Input images have different height"
+                s_left, s_bottom, s_right, s_top = src.bounds
+                assert round(left, 4) == round(
+                    s_left, 4
+                ), "Input images have different bounds"
+                assert round(bottom, 4) == round(
+                    s_bottom, 4
+                ), "Input images have different bounds"
+                assert round(right, 4) == round(
+                    s_right, 4
+                ), "Input images have different bounds"
+                assert round(top, 4) == round(
+                    s_top, 4
+                ), "Input images have different bounds"
+            sources.append(src)
+        except (AssertionError, rasterio.errors.RasterioIOError) as e:
+            logging.error(e, exc_info=logger.getEffectiveLevel() == logging.DEBUG)
+            sys.exit(1)
 
     src = sources[0]
     affine = src.transform
