@@ -65,21 +65,21 @@ def raster2df(*src_rasters, max_block_size=4096, calc_area=False):
                 left, bottom, right, top = src.bounds
                 first = False
             else:
-                assert width == src.width, "Input images have different width"
-                assert height == src.height, "Input images have different height"
+                assert width == src.width, "Input rasters must have same dimensions"
+                assert height == src.height, "Input rasters must have same dimensions"
                 s_left, s_bottom, s_right, s_top = src.bounds
                 assert round(left, 4) == round(
                     s_left, 4
-                ), "Input images have different bounds"
+                ), "Input rasters must have same bounds"
                 assert round(bottom, 4) == round(
                     s_bottom, 4
-                ), "Input images have different bounds"
+                ), "Input rasters must have same bounds"
                 assert round(right, 4) == round(
                     s_right, 4
-                ), "Input images have different bounds"
+                ), "Input rasters must have same bounds"
                 assert round(top, 4) == round(
                     s_top, 4
-                ), "Input images have different bounds"
+                ), "Input rasters must have same bounds"
             sources.append(src)
         except (AssertionError, rasterio.errors.RasterioIOError) as e:
             logging.error(e, exc_info=logger.getEffectiveLevel() == logging.DEBUG)
