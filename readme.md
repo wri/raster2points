@@ -33,7 +33,7 @@ from raster2points import raster2df
 raster1 = "path/to/file1"
 raster2 = "path/to/file2"
 
-df = raster2csv.raster2df(raster1, raster2)
+df = raster2df(raster1, raster2, calc_area=True)
 
 print(df.columns)
 print(df.dtypes)
