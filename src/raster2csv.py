@@ -6,9 +6,10 @@ import math
 import argparse
 import itertools
 from datetime import datetime
+from numba import jit
 
 
-def raster2csv(src_rasters, csv_file, separator, max_block_size=4096):
+def raster2csv(src_rasters, csv_file, separator, max_block_size=4096, calc_area=False):
     """
     Convert rasters to CSV.
     Input rasters must match cell size and extent.
@@ -20,12 +21,12 @@ def raster2csv(src_rasters, csv_file, separator, max_block_size=4096):
     :return: None
     """
 
-    table = raster2df(src_rasters, max_block_size)
+    table = raster2df(src_rasters, max_block_size, calc_area)
 
     table.to_csv(csv_file, sep=separator, header=True, index=False)
 
 
-def raster2df(src_rasters, max_block_size=4096):
+def raster2df(src_rasters, max_block_size=4096, calc_area=False):
     """
     Converts raster into Panda DataFrame.
     Input rasters must match cell size and extent.
@@ -53,6 +54,7 @@ def raster2df(src_rasters, max_block_size=4096):
         "step_height": step_height,
         "width": src.width,
         "height": src.height,
+        "calc_area": calc_area
     }
 
     cols = range(0, src.width, step_width)
@@ -65,6 +67,8 @@ def raster2df(src_rasters, max_block_size=4096):
     # This throws and error b/c truth numpy arrays and pandas data frames are ambiguous.
     # Submitted ticket here https://github.com/gtsystem/parallelpipe/issues/1
     # Not sure if this is something parallelpipe can fix or if this is multiprocssing issue
+    # TODO: This works when packing the array into a tuple (array,)
+    #  still need to reimplemente later
 
     dfs = process_blocks(blocks, sources, **kwargs)
 
@@ -85,7 +89,7 @@ def raster2df(src_rasters, max_block_size=4096):
 
 
 def process_blocks(
-    blocks, sources, col_size, row_size, step_width, step_height, width, height
+    blocks, sources, col_size, row_size, step_width, step_height, width, height, calc_area
 ):
     """
     Loops over all blocks and reads first input raster to get coordinates.
@@ -114,7 +118,7 @@ def process_blocks(
 
         left, top, right, bottom = src.window_bounds(window)
         w = src.read(1, window=window)
-        lat_lon = get_lat_lon(w, col_size, row_size, left, bottom)
+        lat_lon = get_lat_lon(w, col_size, row_size, left, bottom, calc_area)
         del w
 
         if lat_lon.shape[0] == 0:
@@ -125,7 +129,7 @@ def process_blocks(
         yield pd.concat([lat_lon, values], axis=1)
 
 
-def get_lat_lon(array, x_size, y_size, left, bottom):
+def get_lat_lon(array, x_size, y_size, left, bottom, calc_area):
     """
     Create x/y indices for all nonzero pixels
     Computes lat lon coordinates based on lower left corner and pixel size
@@ -139,8 +143,8 @@ def get_lat_lon(array, x_size, y_size, left, bottom):
     """
     (y_index, x_index) = np.nonzero(array)
 
-    x_coords = x_index * x_size + left + (x_size / 2)
-    y_coords = y_index * y_size + bottom + (y_size / 2)
+    x_coords = get_coord(x_index, x_size, left)
+    y_coords = get_coord(y_index, y_size, bottom)
 
     lon = pd.Series(x_coords)
     lat = pd.Series(y_coords)
@@ -151,6 +155,10 @@ def get_lat_lon(array, x_size, y_size, left, bottom):
             "lat": lat.astype("float32", copy=False),
         }
     )
+
+    if calc_area:
+        area = pd.Series(get_area(y_coords, y_size, x_size)).astype("float32", copy=False)
+        df["area"] = area
 
     return df
 
@@ -182,6 +190,58 @@ def get_values(sources, window, threshold=0):
         df_col += 1
 
     return df
+
+
+@jit()
+def get_coord(index, size, offset):
+    return index * size + offset + (size / 2)
+
+
+@jit()
+def get_area(lat, d_lat, d_lon):
+    """
+    Calculate geodesic area for grid cells using WGS 1984 as spatial reference.
+    Cell/Pixel size various with latitude.
+    """
+    a = 6378137.0  # Semi major axis of WGS 1984 ellipsoid
+    b = 6356752.314245179  # Semi minor axis of WGS 1984 ellipsoid
+
+    pi = math.pi
+
+    q = d_lon / 360
+    e = math.sqrt(1 - (b / a) ** 2)
+
+    area = (
+        abs(
+            (
+                pi
+                * b ** 2
+                * (
+                    2 * np.arctanh(e * np.sin(np.radians(lat + d_lat))) / (2 * e)
+                    + np.sin(np.radians(lat + d_lat))
+                    / (
+                        (1 + e * np.sin(np.radians(lat + d_lat)))
+                        * (1 - e * np.sin(np.radians(lat + d_lat)))
+                    )
+                )
+            )
+            - (
+                pi
+                * b ** 2
+                * (
+                    2 * np.arctanh(e * np.sin(np.radians(lat))) / (2 * e)
+                    + np.sin(np.radians(lat))
+                    / (
+                        (1 + e * np.sin(np.radians(lat)))
+                        * (1 - e * np.sin(np.radians(lat)))
+                    )
+                )
+            )
+        )
+        * q
+    )
+
+    return area
 
 
 def get_steps(image, max_size=4096):
@@ -238,6 +298,20 @@ def get_window_height(row, step_height, image_height):
         return step_height
 
 
+def str2bool(v):
+    """
+    Convert various strings to boolean
+    :param v: String
+    :return: Boolean
+    """
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Boolean value expected.")
+
+
 def main():
 
     parser = argparse.ArgumentParser(description="Convert raster to CSV")
@@ -264,14 +338,23 @@ def main():
         help="max block size (multiple of 256)",
     )
 
+    parser.add_argument(
+        "--calc_area",
+        type=str2bool,
+        nargs="?",
+        default=False,
+        const=True,
+        help="Calculate Pixel geodesic area",
+    )
+
     args = parser.parse_args()
 
     if args.separator == "t":
         separator = "\t"
     else:
-        separator = args.seperator
+        separator = args.separator
 
-    raster2csv(args.input, args.output, separator, args.max_block_size)
+    raster2csv(args.input, args.output, separator, args.max_block_size, args.calc_area)
 
 
 if __name__ == "__main__":
