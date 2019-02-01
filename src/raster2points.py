@@ -326,4 +326,3 @@ def get_window_height(row, step_height, image_height):
         return image_height - row
     else:
         return step_height
-
