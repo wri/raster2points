@@ -14,7 +14,7 @@ This module uses rasterio and requires `GDAL>=1.11`.
 It is not yet available on pypy but you can install it directly from within the repo.
 
 ```bash
-pip install -e .
+pip install raster2points
 ```
 
 ## CLI Usage:
