@@ -40,22 +40,32 @@ def raster2df(src_rasters, max_block_size=4096, calc_area=False):
     """
 
     sources = list()
-    i = 0
+    first = True
     for raster in src_rasters:
 
         src = rasterio.open(raster)
-        if i == 0:
+        if first:
             width = src.width
             height = src.height
-            transform = src.transform
+            left, bottom, right, top = src.bounds
+            first = False
         else:
             assert width == src.width, "Input images have different width"
             assert height == src.height, "Input images have different height"
-            assert (
-                transform == src.transform
-            ), "Input images have pixel size and/or extent"
+            s_left, s_bottom, s_right, s_top = src.bounds
+            assert round(left, 4) == round(
+                s_left, 4
+            ), "Input images have different bounds"
+            assert round(bottom, 4) == round(
+                s_bottom, 4
+            ), "Input images have different bounds"
+            assert round(right, 4) == round(
+                s_right, 4
+            ), "Input images have different bounds"
+            assert round(top, 4) == round(
+                s_top, 4
+            ), "Input images have different bounds"
         sources.append(src)
-        i += 1
 
     src = sources[0]
     affine = src.transform
@@ -163,7 +173,7 @@ def get_lat_lon(array, x_size, y_size, left, bottom, calc_area):
     :param bottom: min lat
     :return: Table of lat/lon cooridinates
     """
-    (y_index, x_index) = np.nonzero(array)
+    (y_index, x_index) = get_index(array)
 
     x_coords = get_coord(x_index, x_size, left)
     y_coords = get_coord(y_index, y_size, bottom)
@@ -201,9 +211,9 @@ def get_values(sources, window, threshold=0):
         w = src.read(1, window=window)
 
         if df_col == 0:
-            mask = w > threshold
+            mask = get_mask(w, threshold)
 
-        s = pd.Series(np.extract(mask, w))
+        s = pd.Series(apply_mask(mask, w))
 
         if df_col == 0:
             df = pd.DataFrame({"val{}".format(df_col): s.astype(dtype, copy=False)})
@@ -214,6 +224,21 @@ def get_values(sources, window, threshold=0):
         df_col += 1
 
     return df
+
+
+@jit()  # using numba.jit to precompile calculations
+def get_mask(w, threshold):
+    return w > threshold
+
+
+@jit()  # using numba.jit to precompile calculations
+def apply_mask(mask, w):
+    return np.extract(mask, w)
+
+
+@jit()  # using numba.jit to precompile calculations
+def get_index(array):
+    return np.nonzero(array)
 
 
 @jit()  # using numba.jit to precompile calculations
