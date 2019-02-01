@@ -1,11 +1,11 @@
 from setuptools import setup
 
-with open("README.md", "r") as fh:
+with open("readme.md", "r") as fh:
     long_description = fh.read()
 
 setup(
     name="raster2points",
-    version="0.1.0",
+    version="0.1.1",
     description="Tool to convert rasters to points",
     long_description=long_description,
     long_description_content_type="text/markdown",
