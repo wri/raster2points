@@ -1,23 +1,5 @@
 import argparse
-from raster2points import raster2df
-from datetime import datetime
-
-
-def raster2csv(src_rasters, csv_file, separator, max_block_size=4096, calc_area=False):
-    """
-    Convert rasters to CSV.
-    Input rasters must match cell size and extent.
-    Tool writes final result text file
-    :param src_rasters: list of input rasters
-    :param csv_file: output file
-    :param separator: separator used in CSV file
-    :param max_block_size: max block size to process
-    :return: None
-    """
-
-    table = raster2df(src_rasters, max_block_size, calc_area)
-
-    table.to_csv(csv_file, sep=separator, header=True, index=False)
+from raster2points import raster2csv
 
 
 def str2bool(v):
@@ -76,10 +58,16 @@ def main():
     else:
         separator = args.separator
 
-    raster2csv(args.input, args.output, separator, args.max_block_size, args.calc_area)
+    files = args.input + [args.output]
+
+    raster2csv(
+        *files,
+        separator=separator,
+        max_block_size=args.max_block_size,
+        calc_area=args.calc_area
+    )
 
 
 if __name__ == "__main__":
-    now = datetime.now()
+
     main()
-    print(datetime.now() - now)

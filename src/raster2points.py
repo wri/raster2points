@@ -7,7 +7,29 @@ import itertools
 from numba import jit
 
 
-def raster2df(src_rasters, max_block_size=4096, calc_area=False):
+def raster2csv(*files, separator=",", max_block_size=4096, calc_area=False):
+    """
+    Convert rasters to CSV.
+    Input rasters must match cell size and extent.
+    Tool writes final result text file
+    :param src_rasters: list of input rasters
+    :param csv_file: output file
+    :param separator: separator used in CSV file
+    :param max_block_size: max block size to process
+    :return: None
+    """
+
+    assert len(files) >= 2, "No output file provided"
+
+    csv_file = files[-1:]
+    src_rasters = files[:-1]
+
+    table = raster2df(*src_rasters, max_block_size=max_block_size, calc_area=calc_area)
+
+    table.to_csv(csv_file, sep=separator, header=True, index=False)
+
+
+def raster2df(*src_rasters, max_block_size=4096, calc_area=False):
     """
     Converts raster into Panda DataFrame.
     Input rasters must match cell size and extent.
@@ -17,7 +39,7 @@ def raster2df(src_rasters, max_block_size=4096, calc_area=False):
     If more than one input raster is provided tool adds additional columns to CSV with coresponing values.
     :param src_rasters:
     :param max_block_size:
-    :return:
+    :return: Pandas Data Frame
     """
 
     sources = list()
@@ -50,7 +72,7 @@ def raster2df(src_rasters, max_block_size=4096, calc_area=False):
 
     src = sources[0]
     affine = src.transform
-    step_width, step_height = get_steps(src, max_block_size)
+    step_width, step_height = _get_steps(src, max_block_size)
 
     kwargs = {
         "col_size": affine[0],
@@ -75,7 +97,7 @@ def raster2df(src_rasters, max_block_size=4096, calc_area=False):
     # TODO: This works when packing the array into a tuple (array,)
     #  still need to reimplemente later
 
-    dfs = process_blocks(blocks, sources, **kwargs)
+    dfs = _process_blocks(blocks, sources, **kwargs)
 
     first = True
     for df in dfs:
@@ -93,7 +115,7 @@ def raster2df(src_rasters, max_block_size=4096, calc_area=False):
     return dataframe
 
 
-def process_blocks(
+def _process_blocks(
     blocks,
     sources,
     col_size,
@@ -123,26 +145,26 @@ def process_blocks(
         col = block[0]
         row = block[1]
 
-        w_width = get_window_width(col, step_width, width)
-        w_height = get_window_height(row, step_height, height)
+        w_width = _get_window_size(col, step_width, width)
+        w_height = _get_window_size(row, step_height, height)
         window = Window(col, row, w_width, w_height)
 
         src = sources[0]
 
         left, top, right, bottom = src.window_bounds(window)
         w = src.read(1, window=window)
-        lat_lon = get_lat_lon(w, col_size, row_size, left, bottom, calc_area)
+        lat_lon = _get_lat_lon(w, col_size, row_size, left, bottom, calc_area)
         del w
 
         if lat_lon.shape[0] == 0:
             break
 
-        values = get_values(sources, window)
+        values = _get_values(sources, window)
 
         yield pd.concat([lat_lon, values], axis=1)
 
 
-def get_lat_lon(array, x_size, y_size, left, bottom, calc_area):
+def _get_lat_lon(array, x_size, y_size, left, bottom, calc_area):
     """
     Create x/y indices for all nonzero pixels
     Computes lat lon coordinates based on lower left corner and pixel size
@@ -152,12 +174,12 @@ def get_lat_lon(array, x_size, y_size, left, bottom, calc_area):
     :param y_size: pixel height
     :param left: min lon
     :param bottom: min lat
-    :return: Table of lat/lon cooridinates
+    :return: Pandas data frame with lat/lon coordinates
     """
-    (y_index, x_index) = get_index(array)
+    (y_index, x_index) = _get_index(array)
 
-    x_coords = get_coord(x_index, x_size, left)
-    y_coords = get_coord(y_index, y_size, bottom)
+    x_coords = _get_coord(x_index, x_size, left)
+    y_coords = _get_coord(y_index, y_size, bottom)
 
     lon = pd.Series(x_coords)
     lat = pd.Series(y_coords)
@@ -170,7 +192,7 @@ def get_lat_lon(array, x_size, y_size, left, bottom, calc_area):
     )
 
     if calc_area:
-        area = pd.Series(get_area(y_coords, y_size, x_size)).astype(
+        area = pd.Series(_get_area(y_coords, y_size, x_size)).astype(
             "float32", copy=False
         )
         df["area"] = area
@@ -178,13 +200,13 @@ def get_lat_lon(array, x_size, y_size, left, bottom, calc_area):
     return df
 
 
-def get_values(sources, window, threshold=0):
+def _get_values(sources, window, threshold=0):
     """
     Extract values for all non null cells for all input images
     :param src_rasters:
     :param window:
     :param threshold:
-    :return:
+    :return: Pandas Dataframe with values
     """
     df_col = 0
     for src in sources:
@@ -192,9 +214,9 @@ def get_values(sources, window, threshold=0):
         w = src.read(1, window=window)
 
         if df_col == 0:
-            mask = get_mask(w, threshold)
+            mask = _get_mask(w, threshold)
 
-        s = pd.Series(apply_mask(mask, w))
+        s = pd.Series(_apply_mask(mask, w))
 
         if df_col == 0:
             df = pd.DataFrame({"val{}".format(df_col): s.astype(dtype, copy=False)})
@@ -208,31 +230,36 @@ def get_values(sources, window, threshold=0):
 
 
 @jit()  # using numba.jit to precompile calculations
-def get_mask(w, threshold):
+def _get_mask(w, threshold):
     return w > threshold
 
 
 @jit()  # using numba.jit to precompile calculations
-def apply_mask(mask, w):
+def _apply_mask(mask, w):
     return np.extract(mask, w)
 
 
 @jit()  # using numba.jit to precompile calculations
-def get_index(array):
+def _get_index(array):
     return np.nonzero(array)
 
 
 @jit()  # using numba.jit to precompile calculations
-def get_coord(index, size, offset):
+def _get_coord(index, size, offset):
     return index * size + offset + (size / 2)
 
 
 @jit()  # using numba.jit to precompile calculations
-def get_area(lat, d_lat, d_lon):
+def _get_area(lat, d_lat, d_lon):
     """
     Calculate geodesic area for grid cells using WGS 1984 as spatial reference.
     Cell/Pixel size various with latitude.
+    :param lat: array with lat coord
+    :param d_lat: pixel hight
+    :param d_lon: pixel width
+    :return: Numpy Array with pixel area
     """
+
     a = 6378137.0  # Semi major axis of WGS 1984 ellipsoid
     b = 6356752.314245179  # Semi minor axis of WGS 1984 ellipsoid
 
@@ -274,7 +301,7 @@ def get_area(lat, d_lat, d_lon):
     return area
 
 
-def get_steps(image, max_size=4096):
+def _get_steps(image, max_size=4096):
     """
     Compute optimal block size.
     Should be always a multiple of image block size
@@ -296,33 +323,17 @@ def get_steps(image, max_size=4096):
     return step_width, step_height
 
 
-def get_window_width(col, step_width, image_width):
+def _get_window_size(offset, step_size, image_size):
     """
-    Calculate window width.
+    Calculate window width or height.
     Usually same as block size, except when at the end of image and only a
     fracture of block size remains
-    :param col: start columns
-    :param step_width: block width
-    :param image_width: image width
-    :return: window width
+    :param offset: start columns/ row
+    :param step_size: block width/ height
+    :param image_size: image width/ height
+    :return: window width/ height
     """
-    if col + step_width > image_width:
-        return image_width - col
+    if offset + step_size > image_size:
+        return image_size - offset
     else:
-        return step_width
-
-
-def get_window_height(row, step_height, image_height):
-    """
-        Calculate window height.
-        Usually same as block size, except when at the end of image and only a
-        fracture of block size remains
-        :param row: start row
-        :param step_height: block height
-        :param image_height: image height
-        :return: window height
-        """
-    if row + step_height > image_height:
-        return image_height - row
-    else:
-        return step_height
+        return step_size
