@@ -1,10 +1,15 @@
-from setuptools import setup  # , Extension
+from setuptools import setup
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 setup(
     name="raster2points",
     version="0.1.0",
     description="Tool to convert rasters to points",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://github.com/wri/raster2points",
     package_dir={"": "src"},
     author="Thomas Maschler",
     author_email="thomas.maschler@wri.org",
@@ -17,3 +22,4 @@ setup(
         "Operating System :: OS Independent",
     ]
 )
+
