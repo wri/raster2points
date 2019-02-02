@@ -19,7 +19,13 @@ pip install raster2points
 
 ## CLI Usage:
 ```bash
-raster2csv.py [-h] [--separator {,,;,t}] [--max_block_size MAX_BLOCK_SIZE] [--calc_area] INPUT [INPUT ...] OUTPUT
+raster2csv.py   [-h]
+                [--separator {,,;,t}]
+                [--max_block_size MAX_BLOCK_SIZE]
+                [--calc_area [CALC_AREA]]
+                [--workers WORKERS]
+                INPUT [INPUT ...]
+                OUTPUT
 
 ```
 
