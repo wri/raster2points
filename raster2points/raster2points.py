@@ -1,4 +1,5 @@
 from rasterio.windows import Window
+from parallelpipe import Stage
 import rasterio
 import numpy as np
 import pandas as pd
@@ -6,15 +7,9 @@ import math
 import itertools
 from numba import jit
 import logging
-import sys
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler(sys.stdout)
-logger.addHandler(handler)
 
 
-def raster2csv(*files, separator=",", max_block_size=4096, calc_area=False):
+def raster2csv(*files, separator=",", max_block_size=4096, calc_area=False, workers=1):
     """
     Convert rasters to CSV.
     Input rasters must match cell size and extent.
@@ -31,16 +26,18 @@ def raster2csv(*files, separator=",", max_block_size=4096, calc_area=False):
     csv_file = files[-1:][0]  # files[-1:] returns a tuple with one element
     src_rasters = files[:-1]
 
-    logging.info("Compiling data")
+    logging.info(
+        "Extract data using {} worker{}".format(workers, "" if workers == 1 else "s")
+    )
     table = raster2df(*src_rasters, max_block_size=max_block_size, calc_area=calc_area)
 
-    logging.info("Writing to file: " + csv_file)
+    logging.info("Write to file: " + csv_file)
     table.to_csv(csv_file, sep=separator, header=True, index=False)
 
     logging.info("Done.")
 
 
-def raster2df(*src_rasters, max_block_size=4096, calc_area=False):
+def raster2df(*src_rasters, max_block_size=4096, calc_area=False, workers=1):
     """
     Converts raster into Panda DataFrame.
     Input rasters must match cell size and extent.
@@ -48,42 +45,14 @@ def raster2df(*src_rasters, max_block_size=4096, calc_area=False):
     Only cells which are are above given Threshold/ not NoData are processed
     The tool calculates lat lon for every grid cell and extract the cell value.
     If more than one input raster is provided tool adds additional columns to CSV with coresponing values.
-    :param src_rasters:
-    :param max_block_size:
-    :return: Pandas Data Frame
+    :param src_rasters: Input rasters (one or many)
+    :param max_block_size: maximum block size to process in at once
+    :param calc_area: Calculate geodesic area
+    :param workers: number of parallel workers
+    :return: Pandas data frame
     """
 
-    sources = list()
-    first = True
-    for raster in src_rasters:
-
-        try:
-            src = rasterio.open(raster)
-            if first:
-                width = src.width
-                height = src.height
-                left, bottom, right, top = src.bounds
-                first = False
-            else:
-                assert width == src.width, "Input rasters must have same dimensions"
-                assert height == src.height, "Input rasters must have same dimensions"
-                s_left, s_bottom, s_right, s_top = src.bounds
-                assert round(left, 4) == round(
-                    s_left, 4
-                ), "Input rasters must have same bounds"
-                assert round(bottom, 4) == round(
-                    s_bottom, 4
-                ), "Input rasters must have same bounds"
-                assert round(right, 4) == round(
-                    s_right, 4
-                ), "Input rasters must have same bounds"
-                assert round(top, 4) == round(
-                    s_top, 4
-                ), "Input rasters must have same bounds"
-            sources.append(src)
-        except (AssertionError, rasterio.errors.RasterioIOError) as e:
-            logging.error(e, exc_info=logger.getEffectiveLevel() == logging.DEBUG)
-            sys.exit(1)
+    sources = _assert_sources(src_rasters)
 
     src = sources[0]
     affine = src.transform
@@ -104,30 +73,51 @@ def raster2df(*src_rasters, max_block_size=4096, calc_area=False):
 
     blocks = itertools.product(cols, rows)
 
-    # pipe = blocks | Stage(process_blocks, src_rasters, **kwargs).setup(workers=workers)
-    # Tried using parallel pipeline to speed up processing
-    # This throws and error b/c truth numpy arrays and pandas data frames are ambiguous.
-    # Submitted ticket here https://github.com/gtsystem/parallelpipe/issues/1
-    # Not sure if this is something parallelpipe can fix or if this is multiprocssing issue
-    # TODO: This works when packing the array into a tuple (array,)
-    #  still need to reimplemente later
+    pipe = blocks | Stage(_process_blocks, sources, **kwargs).setup(workers=workers)
 
-    dfs = _process_blocks(blocks, sources, **kwargs)
-
-    first = True
-    for df in dfs:
-
-        if first:
-            dataframe = df
-            first = False
+    data_frame = pd.DataFrame()
+    for df in pipe.results():
+        if data_frame.empty:
+            data_frame = df[0]  # unpack data frame from tuple
         else:
-
-            dataframe = pd.concat([dataframe, df])
+            data_frame = pd.concat([data_frame, df[0]])
 
     for src in sources:
         src.close()
 
-    return dataframe
+    return data_frame
+
+
+def _assert_sources(src_rasters):
+    sources = list()
+    first = True
+    for raster in src_rasters:
+
+        src = rasterio.open(raster)
+        if first:
+            width = src.width
+            height = src.height
+            left, bottom, right, top = src.bounds
+            first = False
+        else:
+            assert width == src.width, "Input rasters must have same dimensions"
+            assert height == src.height, "Input rasters must have same dimensions"
+            s_left, s_bottom, s_right, s_top = src.bounds
+            assert round(left, 4) == round(
+                s_left, 4
+            ), "Input rasters must have same bounds"
+            assert round(bottom, 4) == round(
+                s_bottom, 4
+            ), "Input rasters must have same bounds"
+            assert round(right, 4) == round(
+                s_right, 4
+            ), "Input rasters must have same bounds"
+            assert round(top, 4) == round(
+                s_top, 4
+            ), "Input rasters must have same bounds"
+        sources.append(src)
+
+    return sources
 
 
 def _process_blocks(
@@ -176,7 +166,9 @@ def _process_blocks(
 
         values = _get_values(sources, window)
 
-        yield pd.concat([lat_lon, values], axis=1)
+        yield (
+            pd.concat([lat_lon, values], axis=1),
+        )  # need to pack data frame into tuple
 
 
 def _get_lat_lon(array, x_size, y_size, left, bottom, calc_area):

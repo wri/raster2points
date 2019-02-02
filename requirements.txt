@@ -2,3 +2,4 @@ rasterio
 pandas
 pre-commit
 numba
+parallelpipe

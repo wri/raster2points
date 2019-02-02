@@ -1,5 +1,9 @@
 import argparse
 from raster2points import raster2csv
+from rasterio.errors import RasterioIOError
+import logging
+import sys
+from datetime import datetime
 
 
 def str2bool(v):
@@ -17,6 +21,11 @@ def str2bool(v):
 
 
 def main():
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler(sys.stdout)
+    logger.addHandler(handler)
 
     parser = argparse.ArgumentParser(description="Convert raster to CSV")
 
@@ -51,6 +60,14 @@ def main():
         help="Calculate Pixel geodesic area",
     )
 
+    parser.add_argument(
+        "--workers",
+        "-w",
+        default=1,
+        type=int,
+        help="Number of workers to run in parallel",
+    )
+
     args = parser.parse_args()
 
     if args.separator == "t":
@@ -60,12 +77,19 @@ def main():
 
     files = args.input + [args.output]
 
-    raster2csv(
-        *files,
-        separator=separator,
-        max_block_size=args.max_block_size,
-        calc_area=args.calc_area
-    )
+    start = datetime.now()
+    try:
+        raster2csv(
+            *files,
+            separator=separator,
+            max_block_size=args.max_block_size,
+            calc_area=args.calc_area,
+            workers=args.workers
+        )
+    except (AssertionError, RasterioIOError) as e:
+        logging.error(e, exc_info=logger.getEffectiveLevel() == logging.DEBUG)
+        sys.exit(1)
+    logging.info("time elapsed: {}".format(datetime.now() - start))
 
 
 if __name__ == "__main__":

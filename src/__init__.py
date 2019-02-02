@@ -1,1 +1,0 @@
-name = "raster2points"
