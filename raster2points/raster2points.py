@@ -161,14 +161,13 @@ def _process_blocks(
         lat_lon = _get_lat_lon(w, col_size, row_size, left, bottom, calc_area)
         del w
 
-        if lat_lon.shape[0] == 0:
-            break
+        if lat_lon.shape[0] > 0:
 
-        values = _get_values(sources, window)
+            values = _get_values(sources, window)
 
-        yield (
-            pd.concat([lat_lon, values], axis=1),
-        )  # need to pack data frame into tuple
+            yield (
+                pd.concat([lat_lon, values], axis=1),
+            )  # need to pack data frame into tuple
 
 
 def _get_lat_lon(array, x_size, y_size, left, bottom, calc_area):
