@@ -36,6 +36,14 @@ def main():
     parser.add_argument("output", metavar="OUTPUT", type=str, help="Output CSV")
 
     parser.add_argument(
+        "--col_names",
+        default=None,
+        nargs="+",
+        type=str,
+        help="Column names for raster values (default: val1, val2, ...)",
+    )
+
+    parser.add_argument(
         "--separator",
         "-s",
         default=",",
@@ -81,6 +89,7 @@ def main():
     try:
         raster2csv(
             *files,
+            col_names=args.col_names,
             separator=separator,
             max_block_size=args.max_block_size,
             calc_area=args.calc_area,

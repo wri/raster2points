@@ -9,7 +9,14 @@ from numba import jit
 import logging
 
 
-def raster2csv(*files, separator=",", max_block_size=4096, calc_area=False, workers=1):
+def raster2csv(
+    *files,
+    col_names=None,
+    separator=",",
+    max_block_size=4096,
+    calc_area=False,
+    workers=1
+):
     """
     Convert rasters to CSV.
     Input rasters must match cell size and extent.
@@ -29,7 +36,12 @@ def raster2csv(*files, separator=",", max_block_size=4096, calc_area=False, work
     logging.info(
         "Extract data using {} worker{}".format(workers, "" if workers == 1 else "s")
     )
-    table = raster2df(*src_rasters, max_block_size=max_block_size, calc_area=calc_area)
+    table = raster2df(
+        *src_rasters,
+        col_names=col_names,
+        max_block_size=max_block_size,
+        calc_area=calc_area
+    )
 
     logging.info("Write to file: " + csv_file)
     table.to_csv(csv_file, sep=separator, header=True, index=False)
@@ -37,7 +49,9 @@ def raster2csv(*files, separator=",", max_block_size=4096, calc_area=False, work
     logging.info("Done.")
 
 
-def raster2df(*src_rasters, max_block_size=4096, calc_area=False, workers=1):
+def raster2df(
+    *src_rasters, col_names=None, max_block_size=4096, calc_area=False, workers=1
+):
     """
     Converts raster into Panda DataFrame.
     Input rasters must match cell size and extent.
@@ -46,11 +60,17 @@ def raster2df(*src_rasters, max_block_size=4096, calc_area=False, workers=1):
     The tool calculates lat lon for every grid cell and extract the cell value.
     If more than one input raster is provided tool adds additional columns to CSV with coresponing values.
     :param src_rasters: Input rasters (one or many)
+    :param col_names: Column names for input raster values (optional, default: val1, val2, ...)
     :param max_block_size: maximum block size to process in at once
     :param calc_area: Calculate geodesic area
     :param workers: number of parallel workers
     :return: Pandas data frame
     """
+
+    if col_names:
+        assert len(src_rasters) == len(
+            col_names
+        ), "Number of named columns does not match number of input rasters. Abort."
 
     sources = _assert_sources(src_rasters)
 
@@ -82,6 +102,12 @@ def raster2df(*src_rasters, max_block_size=4096, calc_area=False, workers=1):
         else:
             data_frame = pd.concat([data_frame, df[0]])
 
+    if col_names:
+        i = 1
+        for col_name in col_names:
+            df.rename(index=str, columns={"val{}".format(i): col_name})
+            i += 1
+
     for src in sources:
         src.close()
 
@@ -100,21 +126,23 @@ def _assert_sources(src_rasters):
             left, bottom, right, top = src.bounds
             first = False
         else:
-            assert width == src.width, "Input rasters must have same dimensions"
-            assert height == src.height, "Input rasters must have same dimensions"
+            assert width == src.width, "Input rasters must have same dimensions. Abort."
+            assert (
+                height == src.height
+            ), "Input rasters must have same dimensions Abort."
             s_left, s_bottom, s_right, s_top = src.bounds
             assert round(left, 4) == round(
                 s_left, 4
-            ), "Input rasters must have same bounds"
+            ), "Input rasters must have same bounds. Abort."
             assert round(bottom, 4) == round(
                 s_bottom, 4
-            ), "Input rasters must have same bounds"
+            ), "Input rasters must have same bounds. Abort."
             assert round(right, 4) == round(
                 s_right, 4
-            ), "Input rasters must have same bounds"
+            ), "Input rasters must have same bounds. Abort."
             assert round(top, 4) == round(
                 s_top, 4
-            ), "Input rasters must have same bounds"
+            ), "Input rasters must have same bounds. Abort."
         sources.append(src)
 
     return sources
@@ -318,6 +346,7 @@ def _get_steps(image, max_size=4096):
     :return: step width and height
     """
     shape = image.block_shapes[0]
+
     if shape[0] > max_size:
         shape[0] = max_size
     if shape[1] > max_size:
