@@ -347,13 +347,25 @@ def _get_steps(image, max_size=4096):
     """
     shape = image.block_shapes[0]
 
-    if shape[0] > max_size:
-        shape[0] = max_size
-    if shape[1] > max_size:
-        shape[1] = max_size
+    # stripped image, each block represents one row
+    if shape[0] == 1:
+        max_size = max_size ** 2
 
-    step_width = math.floor(max_size / shape[0]) * shape[0]
-    step_height = math.floor(max_size / shape[1]) * shape[1]
+        if shape[1] > max_size:
+            shape[1] = max_size
+
+        step_width = shape[1]
+        step_height = math.floor(max_size / shape[1])
+
+    # tiled image, blocks width and height have equal size
+    else:
+        if shape[0] > max_size:
+            shape[0] = max_size
+        if shape[1] > max_size:
+            shape[1] = max_size
+
+        step_width = math.floor(max_size / shape[0]) * shape[0]
+        step_height = math.floor(max_size / shape[1]) * shape[1]
 
     return step_width, step_height
 
