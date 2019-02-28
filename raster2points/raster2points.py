@@ -103,9 +103,11 @@ def raster2df(
             data_frame = pd.concat([data_frame, df[0]])
 
     if col_names:
-        i = 1
+        i = 0
         for col_name in col_names:
-            df.rename(index=str, columns={"val{}".format(i): col_name})
+            data_frame = data_frame.rename(
+                index=str, columns={"val{}".format(i): col_name}
+            )
             i += 1
 
     for src in sources:
@@ -348,6 +350,9 @@ def _get_steps(image, max_size=4096):
     shape = image.block_shapes[0]
 
     # stripped image, each block represents one row
+    # TODO: Instead of looking at the row number, we should look at the column number of the blocks
+    #  and compare it with the image width. This assures we really work with stripped rasters.
+    #  Stripped rasters can have several rows in one block.
     if shape[0] == 1:
         max_size = max_size ** 2
 
