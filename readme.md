@@ -20,6 +20,7 @@ pip install raster2points
 ## CLI Usage:
 ```bash
 raster2csv.py   [-h]
+                [--col_names COL_NAMES [COL_NAMES ...]]
                 [--separator {,,;,t}]
                 [--max_block_size MAX_BLOCK_SIZE]
                 [--calc_area [CALC_AREA]]
@@ -41,7 +42,7 @@ from raster2points import raster2df
 raster1 = "path/to/file1.tif"
 raster2 = "path/to/file2.tif"
 
-df = raster2df(raster1, raster2, calc_area=True)
+df = raster2df(raster1, raster2, col_names=["name1", "name2"], calc_area=True)
 
 print(df.columns)
 print(df.dtypes)
@@ -57,5 +58,5 @@ raster1 = "path/to/file1.tif"
 raster2 = "path/to/file2.tif"
 output = "path/to/newfile.tsv"
 
-raster2csv(raster1, raster2, output, separator="\t", calc_area=True)
+raster2csv(raster1, raster2, output, col_names=["name1", "name2"], separator="\t", calc_area=True)
 ```
