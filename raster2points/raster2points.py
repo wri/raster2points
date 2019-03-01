@@ -76,7 +76,7 @@ def raster2df(
 
     src = sources[0]
     affine = src.transform
-    step_width, step_height = _get_steps(src, max_block_size)
+    step_height, step_width = _get_steps(src, max_block_size)
 
     kwargs = {
         "col_size": affine[0],
@@ -350,29 +350,26 @@ def _get_steps(image, max_size=4096):
     shape = image.block_shapes[0]
 
     # stripped image, each block represents one row
-    # TODO: Instead of looking at the row number, we should look at the column number of the blocks
-    #  and compare it with the image width. This assures we really work with stripped rasters.
-    #  Stripped rasters can have several rows in one block.
-    if shape[0] == 1:
+    if shape[1] == image.width:
         max_size = max_size ** 2
 
-        if shape[1] > max_size:
-            shape[1] = max_size
-
         step_width = shape[1]
-        step_height = math.floor(max_size / shape[1])
+        if shape[0] * shape[1] > max_size:
+            step_height = shape[0]
+        else:
+            step_height = math.floor(max_size / shape[1] / shape[0]) * shape[0]
 
     # tiled image, blocks width and height have equal size
     else:
-        if shape[0] > max_size:
-            shape[0] = max_size
-        if shape[1] > max_size:
-            shape[1] = max_size
+        if shape[0] * shape[1] > max_size ** 2:
+            step_width = shape[1]
+            step_height = shape[0]
 
-        step_width = math.floor(max_size / shape[0]) * shape[0]
-        step_height = math.floor(max_size / shape[1]) * shape[1]
+        else:
+            step_width = math.floor(max_size / shape[1]) * shape[1]
+            step_height = math.floor(max_size / shape[0]) * shape[0]
 
-    return step_width, step_height
+    return step_height, step_width
 
 
 def _get_window_size(offset, step_size, image_size):
