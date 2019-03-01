@@ -3,3 +3,4 @@ pandas
 pre-commit
 numba
 parallelpipe
+pytest
