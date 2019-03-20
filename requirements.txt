@@ -1,6 +1,10 @@
 rasterio
 pandas
+shapely
 pre-commit
 numba
 parallelpipe
 pytest
+wheel
+twine
+setuptools
