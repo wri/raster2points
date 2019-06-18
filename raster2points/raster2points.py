@@ -9,6 +9,8 @@ from parallelpipe import Stage
 import rasterio
 from rasterio.windows import Window
 
+logger = logging.getLogger('raster2points')
+
 
 def raster2csv(
     *files,
@@ -34,7 +36,7 @@ def raster2csv(
     csv_file = files[-1:][0]  # files[-1:] returns a tuple with one element
     src_rasters = files[:-1]
 
-    logging.info(
+    logger.info(
         "Extract data using {} worker{}".format(workers, "" if workers == 1 else "s")
     )
     table = raster2df(
@@ -44,10 +46,10 @@ def raster2csv(
         calc_area=calc_area
     )
 
-    logging.info("Write to file: " + csv_file)
+    logger.info("Write to file: " + csv_file)
     table.to_csv(csv_file, sep=separator, header=True, index=False)
 
-    logging.info("Done.")
+    logger.info("Done.")
 
 
 def raster2df(
@@ -103,6 +105,7 @@ def raster2df(
         else:
             data_frame = pd.concat([data_frame, df[0]])
 
+    logger.debug("Renaming columns")
     if col_names:
         i = 0
         for col_name in col_names:
@@ -177,9 +180,10 @@ def _process_blocks(
     """
 
     for block in blocks:
-
         col = block[0]
         row = block[1]
+
+        logger.debug("Processing block ({}, {})".format(col, row))
 
         w_width = _get_window_size(col, step_width, width)
         w_height = _get_window_size(row, step_height, height)
