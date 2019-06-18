@@ -1,6 +1,6 @@
-rasterio
-pandas
-pre-commit
 numba
+pandas
 parallelpipe
+pre-commit
 pytest
+rasterio

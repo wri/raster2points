@@ -1,12 +1,13 @@
-from rasterio.windows import Window
-from parallelpipe import Stage
-import rasterio
-import numpy as np
-import pandas as pd
 import math
 import itertools
-from numba import jit
 import logging
+
+from numba import njit
+import numpy as np
+import pandas as pd
+from parallelpipe import Stage
+import rasterio
+from rasterio.windows import Window
 
 
 def raster2csv(

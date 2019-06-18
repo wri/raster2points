@@ -1,9 +1,11 @@
 import argparse
-from raster2points import raster2csv
-from rasterio.errors import RasterioIOError
+from datetime import datetime
 import logging
 import sys
-from datetime import datetime
+
+from rasterio.errors import RasterioIOError
+
+from raster2points import raster2csv
 
 
 def str2bool(v):
