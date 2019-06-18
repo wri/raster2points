@@ -30,10 +30,9 @@ def raster2csv(
     :param max_block_size: max block size to process
     :return: None
     """
-
     assert len(files) >= 2, "No output file provided"
 
-    csv_file = files[-1:][0]  # files[-1:] returns a tuple with one element
+    csv_file = files[-1]
     src_rasters = files[:-1]
 
     logger.info(

@@ -3,4 +3,4 @@ pandas
 parallelpipe
 pre-commit
 pytest
-rasterio
+rasterio[s3]
