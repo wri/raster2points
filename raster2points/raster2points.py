@@ -42,7 +42,8 @@ def raster2csv(
         *src_rasters,
         col_names=col_names,
         max_block_size=max_block_size,
-        calc_area=calc_area
+        calc_area=calc_area,
+        workers=workers,
     )
 
     logger.info("Write to file: " + csv_file)
