@@ -270,27 +270,27 @@ def _get_values(sources, window, threshold=0):
     return df
 
 
-@jit()  # using numba.jit to precompile calculations
+@njit()  # using numba.jit to precompile calculations
 def _get_mask(w, threshold):
     return w > threshold
 
 
-@jit()  # using numba.jit to precompile calculations
+@njit()  # using numba.jit to precompile calculations
 def _apply_mask(mask, w):
     return np.extract(mask, w)
 
 
-@jit()  # using numba.jit to precompile calculations
+@njit()  # using numba.jit to precompile calculations
 def _get_index(array):
     return np.nonzero(array)
 
 
-@jit()  # using numba.jit to precompile calculations
+@njit()  # using numba.jit to precompile calculations
 def _get_coord(index, size, offset):
     return index * size + offset + (size / 2)
 
 
-@jit()  # using numba.jit to precompile calculations
+@njit()  # using numba.jit to precompile calculations
 def _get_area(lat, d_lat, d_lon):
     """
     Calculate geodesic area for grid cells using WGS 1984 as spatial reference.
@@ -310,7 +310,7 @@ def _get_area(lat, d_lat, d_lon):
     e = math.sqrt(1 - (b / a) ** 2)
 
     area = (
-        abs(
+        np.abs(
             (
                 pi
                 * b ** 2
