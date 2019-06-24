@@ -1,9 +1,11 @@
 import argparse
-from raster2points import raster2csv
-from rasterio.errors import RasterioIOError
+from datetime import datetime
 import logging
 import sys
-from datetime import datetime
+
+from rasterio.errors import RasterioIOError
+
+from raster2points import raster2csv
 
 
 def str2bool(v):
@@ -21,10 +23,12 @@ def str2bool(v):
 
 
 def main():
-
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger = logging.getLogger('raster2points')
     handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(
+        logging.Formatter(fmt='%(asctime)s %(levelname)-4s %(message)s',
+                          datefmt='%Y-%m-%d %H:%M:%S')
+    )
     logger.addHandler(handler)
 
     parser = argparse.ArgumentParser(description="Convert raster to CSV")
@@ -76,6 +80,13 @@ def main():
         help="Number of workers to run in parallel",
     )
 
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action='store_true',
+        help="Print additional logging",
+    )
+
     args = parser.parse_args()
 
     if args.separator == "t":
@@ -83,8 +94,12 @@ def main():
     else:
         separator = args.separator
 
-    files = args.input + [args.output]
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
 
+    files = args.input + [args.output]
     start = datetime.now()
     try:
         raster2csv(
@@ -96,9 +111,9 @@ def main():
             workers=args.workers
         )
     except (AssertionError, RasterioIOError) as e:
-        logging.error(e, exc_info=logger.getEffectiveLevel() == logging.DEBUG)
+        logger.error(e, exc_info=logger.getEffectiveLevel() == logging.DEBUG)
         sys.exit(1)
-    logging.info("time elapsed: {}".format(datetime.now() - start))
+    logger.info("time elapsed: {}".format(datetime.now() - start))
 
 
 if __name__ == "__main__":
