@@ -18,8 +18,6 @@ setup(
         "numba~=0.44.1",
         "pandas ~=0.24.2",
         "parallelpipe~=0.2.6",
-        "pre-commit~=1.17.0",
-        "pytest~=4.6.3",
         "rasterio[s3]~=1.0.24",
     ],
     scripts=["raster2points/raster2csv.py"],
