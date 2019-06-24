@@ -1,12 +1,15 @@
-from rasterio.windows import Window
-from parallelpipe import Stage
-import rasterio
-import numpy as np
-import pandas as pd
 import math
 import itertools
-from numba import jit
 import logging
+
+from numba import njit
+import numpy as np
+import pandas as pd
+from parallelpipe import Stage
+import rasterio
+from rasterio.windows import Window
+
+logger = logging.getLogger('raster2points')
 
 
 def raster2csv(
@@ -27,26 +30,26 @@ def raster2csv(
     :param max_block_size: max block size to process
     :return: None
     """
-
     assert len(files) >= 2, "No output file provided"
 
-    csv_file = files[-1:][0]  # files[-1:] returns a tuple with one element
+    csv_file = files[-1]
     src_rasters = files[:-1]
 
-    logging.info(
+    logger.info(
         "Extract data using {} worker{}".format(workers, "" if workers == 1 else "s")
     )
     table = raster2df(
         *src_rasters,
         col_names=col_names,
         max_block_size=max_block_size,
-        calc_area=calc_area
+        calc_area=calc_area,
+        workers=workers,
     )
 
-    logging.info("Write to file: " + csv_file)
+    logger.info("Write to file: " + csv_file)
     table.to_csv(csv_file, sep=separator, header=True, index=False)
 
-    logging.info("Done.")
+    logger.info("Done.")
 
 
 def raster2df(
@@ -102,6 +105,7 @@ def raster2df(
         else:
             data_frame = pd.concat([data_frame, df[0]])
 
+    logger.debug("Renaming columns")
     if col_names:
         i = 0
         for col_name in col_names:
@@ -176,9 +180,10 @@ def _process_blocks(
     """
 
     for block in blocks:
-
         col = block[0]
         row = block[1]
+
+        logger.debug("Processing block ({}, {})".format(col, row))
 
         w_width = _get_window_size(col, step_width, width)
         w_height = _get_window_size(row, step_height, height)
@@ -265,27 +270,27 @@ def _get_values(sources, window, threshold=0):
     return df
 
 
-@jit()  # using numba.jit to precompile calculations
+@njit()  # using numba.jit to precompile calculations
 def _get_mask(w, threshold):
     return w > threshold
 
 
-@jit()  # using numba.jit to precompile calculations
+@njit()  # using numba.jit to precompile calculations
 def _apply_mask(mask, w):
     return np.extract(mask, w)
 
 
-@jit()  # using numba.jit to precompile calculations
+@njit()  # using numba.jit to precompile calculations
 def _get_index(array):
     return np.nonzero(array)
 
 
-@jit()  # using numba.jit to precompile calculations
+@njit()  # using numba.jit to precompile calculations
 def _get_coord(index, size, offset):
     return index * size + offset + (size / 2)
 
 
-@jit()  # using numba.jit to precompile calculations
+@njit()  # using numba.jit to precompile calculations
 def _get_area(lat, d_lat, d_lon):
     """
     Calculate geodesic area for grid cells using WGS 1984 as spatial reference.
@@ -305,7 +310,7 @@ def _get_area(lat, d_lat, d_lon):
     e = math.sqrt(1 - (b / a) ** 2)
 
     area = (
-        abs(
+        np.abs(
             (
                 pi
                 * b ** 2

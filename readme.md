@@ -7,6 +7,11 @@ Successive input rasters will use data mask from first input raster.
 
 Returns a Pandas dataframe, CLI will export results as CSV file.
 
+Input files can be local file paths or S3 paths, or a mix. For reading from
+S3, you'll need [AWS credentials configured](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html),
+such as with a profile in `~/.aws` and an `AWS_PROFILE` variable in your environment.
+
+Multi-worker only works with S3 inputs, not local files.
 
 ## Installation and Dependencies
 
