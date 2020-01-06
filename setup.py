@@ -5,7 +5,7 @@ with open("readme.md", "r") as fh:
 
 setup(
     name="raster2points",
-    version="0.1.7",
+    version="0.1.8",
     description="Tool to convert rasters to points",
     long_description=long_description,
     long_description_content_type="text/markdown",
