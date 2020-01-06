@@ -9,7 +9,7 @@ from parallelpipe import Stage
 import rasterio
 from rasterio.windows import Window
 
-logger = logging.getLogger('raster2points')
+logger = logging.getLogger("raster2points")
 
 
 def raster2csv(

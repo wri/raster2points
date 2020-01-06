@@ -1,4 +1,4 @@
-numba~=0.44.1
+numba~=0.47.0
 pandas~=0.24.2
 parallelpipe~=0.2.6
 pre-commit~=1.17.0
