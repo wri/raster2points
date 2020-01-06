@@ -22,7 +22,7 @@ Use pip to install.
 pip install raster2points
 ```
 
-## CLI Usage:
+## CLI Usage
 ```bash
 raster2csv.py   [-h]
                 [--col_names COL_NAMES [COL_NAMES ...]]
@@ -38,7 +38,6 @@ raster2csv.py   [-h]
 ## Python Usage
 You can also use the module directly in python. It will return a
 Pandas dataframe with your data.
-
 
 Get Pandas data frame
 ```python
