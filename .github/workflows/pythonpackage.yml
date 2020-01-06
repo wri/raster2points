@@ -41,6 +41,7 @@ jobs:
         python-version: 3.7
     - name: Build dist
       run: |
+        ./scripts/setup
         ./scripts/cibuild
     - name: Publish distribution to PyPI
       if: startsWith(github.event.ref, 'refs/tags')
