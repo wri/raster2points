@@ -30,7 +30,8 @@ def raster2csv(
     :param max_block_size: max block size to process
     :return: None
     """
-    assert len(files) >= 2, "No output file provided"
+    if not len(files) >= 2:
+        raise ValueError("No output file provided")
 
     csv_file = files[-1]
     src_rasters = files[:-1]
@@ -70,10 +71,10 @@ def raster2df(
     :return: Pandas data frame
     """
 
-    if col_names:
-        assert len(src_rasters) == len(
-            col_names
-        ), "Number of named columns does not match number of input rasters. Abort."
+    if col_names and not len(src_rasters) == len(col_names):
+        raise ValueError(
+            "Number of named columns does not match number of input rasters. Abort."
+        )
 
     sources = _assert_sources(src_rasters)
 
@@ -132,23 +133,19 @@ def _assert_sources(src_rasters):
             left, bottom, right, top = src.bounds
             first = False
         else:
-            assert width == src.width, "Input rasters must have same dimensions. Abort."
-            assert (
-                height == src.height
-            ), "Input rasters must have same dimensions Abort."
+            if width != src.width:
+                raise ValueError("Input rasters must have same dimensions. Abort.")
+            if height != src.height:
+                raise ValueError("Input rasters must have same dimensions Abort.")
             s_left, s_bottom, s_right, s_top = src.bounds
-            assert round(left, 4) == round(
-                s_left, 4
-            ), "Input rasters must have same bounds. Abort."
-            assert round(bottom, 4) == round(
-                s_bottom, 4
-            ), "Input rasters must have same bounds. Abort."
-            assert round(right, 4) == round(
-                s_right, 4
-            ), "Input rasters must have same bounds. Abort."
-            assert round(top, 4) == round(
-                s_top, 4
-            ), "Input rasters must have same bounds. Abort."
+            if round(left, 4) != round(s_left, 4):
+                raise ValueError("Input rasters must have same bounds. Abort.")
+            if round(bottom, 4) != round(s_bottom, 4):
+                raise ValueError("Input rasters must have same bounds. Abort.")
+            if round(right, 4) != round(s_right, 4):
+                raise ValueError("Input rasters must have same bounds. Abort.")
+            if round(top, 4) != round(s_top, 4):
+                raise ValueError("Input rasters must have same bounds. Abort.")
         sources.append(src)
 
     return sources
@@ -197,7 +194,6 @@ def _process_blocks(
         del w
 
         if lat_lon.shape[0] > 0:
-
             values = _get_values(sources, window)
 
             yield (
