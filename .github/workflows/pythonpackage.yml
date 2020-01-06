@@ -32,7 +32,7 @@ jobs:
         pip install pytest
         pytest
   build-n-publish:
-    if: success() && contains(github.ref_type, 'tag') &&  ( contains(github.ref, 'master')
+    if: success() && contains(github.ref_type, 'tag') &&  contains(github.ref, 'master')
     name: Build and publish Python distribution to PyPI
     runs-on: ubuntu-18.04
     steps:
