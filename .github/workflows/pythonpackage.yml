@@ -30,6 +30,7 @@ jobs:
       run: |
         ./scripts/test
   build-n-publish:
+    if: success()
     name: Build and publish Python distribution to PyPI
     runs-on: ubuntu-18.04
     steps:
