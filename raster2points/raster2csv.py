@@ -23,11 +23,12 @@ def str2bool(v):
 
 
 def main():
-    logger = logging.getLogger('raster2points')
+    logger = logging.getLogger("raster2points")
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(
-        logging.Formatter(fmt='%(asctime)s %(levelname)-4s %(message)s',
-                          datefmt='%Y-%m-%d %H:%M:%S')
+        logging.Formatter(
+            fmt="%(asctime)s %(levelname)-4s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+        )
     )
     logger.addHandler(handler)
 
@@ -81,10 +82,7 @@ def main():
     )
 
     parser.add_argument(
-        "--verbose",
-        "-v",
-        action='store_true',
-        help="Print additional logging",
+        "--verbose", "-v", action="store_true", help="Print additional logging",
     )
 
     args = parser.parse_args()
