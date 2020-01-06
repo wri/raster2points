@@ -1,5 +1,7 @@
 # raster2points
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/d2ccce68bf9f462bae80f5c576a28b24)](https://www.codacy.com/manual/thomas-maschler/gfw_forest_loss_geotrellis?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=wri/gfw_forest_loss_geotrellis&amp;utm_campaign=Badge_Grade)
+
 Convert one or multiple raster images to points.
 Tool will read first input raster and extract lat/lon coordinates and values
 for all pixels which have data. Optional it calculates geodesic area for each point based on pixel size.
