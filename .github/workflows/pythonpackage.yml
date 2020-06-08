@@ -29,9 +29,6 @@ jobs:
     - name: Test with pytest
       run: |
         ./scripts/test
-    - name:
-      if: success() && contains(github.ref, 'master')
-
 
   build-n-publish:
     if: success()
